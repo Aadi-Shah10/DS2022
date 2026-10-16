@@ -80,13 +80,13 @@ Create the credentials file and open it in Cursor:
 
 ```bash
 mkdir -p ~/.aws
-touch ~/.aws/credentials
+touch ~/.aws/credentials # creates empty ~/.aws/credentials
 cursor ~/.aws/credentials
 ```
 
-If the shell reports `cursor: command not found`, open the file from Cursor instead: **File** → **Open File...**, press `Cmd+Shift+.` (Mac) to show hidden folders, and go to `.aws/credentials` in your home folder.
+If the shell reports `cursor: command not found`, open the file from Cursor instead: **File** → **Open File...**, press `Cmd+Shift+.` (Mac) to show hidden folders, and go to `.aws/credentials` in your home folder. Alternatively, you can use other text editors like nano or vi.
 
-Paste the whole block into the file, replacing anything already in it, and save. It should look like this, with each value on a single line (the session token is very long):
+Paste the whole block into the credentials file, replacing anything already in it, and save. It should look like this, with each value on a single line (the session token is very long):
 
 ```text
 [default]
@@ -103,14 +103,6 @@ aws configure set output json
 ```
 
 > **Credentials expire when the lab session ends (about 4 hours).** When `aws` or `boto3` suddenly fail with expired-token errors, click **Start Lab** again if the session has ended, open **AWS Details** → **AWS CLI** → **Show**, copy the new block, and replace the contents of `~/.aws/credentials` with it. The region in `~/.aws/config` stays. Refreshing credentials does not affect your buckets.
-
-Alternatively, export the values in the shell (include the session token):
-
-```bash
-export AWS_ACCESS_KEY_ID="YOUR_ACCESS_KEY"
-export AWS_SECRET_ACCESS_KEY="YOUR_SECRET_KEY"
-export AWS_SESSION_TOKEN="YOUR_SESSION_TOKEN"
-```
 
 Upon completion you will have `~/.aws/config` (region and output format) and `~/.aws/credentials` (the three values from AWS Details).
 
