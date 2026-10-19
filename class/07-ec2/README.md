@@ -27,111 +27,145 @@ This session introduces **Amazon EC2**, virtual machines you rent by the hour. B
 
 | Part | Activity                                        | Time   |
 | ---- | ----------------------------------------------- | ------ |
-| 1    | Recap: S3 from Python (demo)                    | 15 min |
+| 1    | Recap: S3 from Python                           | 15 min |
+| 2    | S3 in the AWS Console                           | 5 min  |
 | --   | Lecture intro to EC2                            | 20 min |
-| 2    | Launch an EC2 instance in the AWS Console + SSH | 15 min |
-| 3    | Launch an EC2 instance from the CLI + clean up  | 20 min |
+| 3    | Launch an EC2 instance in the AWS Console + SSH | 15 min |
+| 4    | Launch an EC2 instance from the CLI + clean up  | 20 min |
 
 
 
 
 ### Before you start
 
+You need the `aws` CLI in the **terminal on your computer**. If `aws --version` fails, install it first: see [Environment (class/06-s3)](../06-s3/README.md#environment).
+
 1. On the **Learner Lab page**, click **Start Lab** and wait for the green **AWS** icon. See [Start the AWS Academy Learner Lab (class/06-s3)](../06-s3/README.md#start-the-aws-academy-learner-lab).
 2. On the **Learner Lab page**, click **AWS Details** (top right) → **AWS CLI** → **Show**. Copy the block into `~/.aws/credentials` on your computer (credentials change with every lab session).
-  - **Quick tip:** In Cursor, open a chat window and enter this prompt: "open ~/.aws/credentials, create a new file if it doesn't exist". Paste your credentials. **Save the file!**
-3. On the **Learner Lab page**, click **AWS Details** → **SSH key** → **Download PEM**. Your browser downloads `labsuser.pem`, the private key of the `vockey` key pair that already exists in your lab account. Next, move it into `~/.ssh` on your computer and make it read-only for you.
+   - **Quick tip:** In Cursor, open a chat window and enter this prompt: "open ~/.aws/credentials, create a new file if it doesn't exist". Paste your credentials. **Save the file!**
+3. On the **Learner Lab page**, click **AWS Details** → **SSH key** → **Download PEM**. Your browser downloads `labsuser.pem`, the private key of the `vockey` key pair that already exists in your lab account. Next, move it into `~/.ssh` on your computer and use `chmod` to make it read-only for you (permission: 400).
 
-Open a **terminal on your computer**. Then,
+   Open a **terminal on your computer**. Then,
+
    **Mac:**
+
+   ```bash
+   mkdir -p ~/.ssh
+   mv ~/Downloads/labsuser.pem ~/.ssh/
+   chmod 400 ~/.ssh/labsuser.pem
+   ```
 
    **WSL:** the browser saves the file in your Windows `Downloads` folder, which WSL sees under `/mnt/c/Users/<windows-user>/`. Replace `<windows-user>` with your Windows user name:
 
+   ```bash
+   mkdir -p ~/.ssh
+   mv /mnt/c/Users/<windows-user>/Downloads/labsuser.pem ~/.ssh/
+   chmod 400 ~/.ssh/labsuser.pem
+   ```
+
    The key must live inside WSL (`~/.ssh`): `chmod` has no effect on files under `/mnt/c`, and `ssh` refuses keys that other users can read.
 
-### 1. Recap: S3 from Python (15 minutes)
+   If `mv` reports `No such file or directory`, your browser saved the file somewhere else (for example a OneDrive folder) or under another name (for example `labsuser (1).pem`). Open the browser's downloads list, choose **Show in folder**, and use that path and file name instead. Put it in quotes if it contains spaces.
 
-In the **terminal on your computer**, run three scripts from **[class/06-s3](../06-s3/)** inside the `.venv` you created last session:
+
+
+### 1. Recap: S3 from Python (15 min)
+
+In the **terminal on your computer**, run two scripts from **[class/06-s3](../06-s3/)**. First go to that folder:
 
 ```bash
 cd <path_to_your_cloned_fork_of_DS2022_repo>/class/06-s3
+```
+
+The folder should have the `.venv` with `boto3` from our last class session. If not, this command creates it:
+
+```bash
 uv venv && uv pip install boto3
 ```
+
+Then run the scripts:
 
 ```bash
 uv run python 00-check-aws-credentials.py   # same as: aws sts get-caller-identity
 ```
 
 ```bash
-uv run python 01-make-bucket.py             # creates practice-$USER (error if it exists already)
-```bash
-
-The scripts and the `aws` CLI make the same API calls with the same credentials. The AWS Console is a third way to make those calls, with a browser.
-
+uv run python 01-make-bucket.py             # creates practice-$USER (no error if you already own it)
 ```
+
+Python scripts, the `aws` command, and the AWS Console are three ways to do the same things in AWS.
 
 ### 2. S3 in the AWS Console (5 min)
 
 1. On the **Learner Lab page**, click the green **AWS** icon to open the **AWS Console**.
 2. In the **AWS Console**, search for **S3** in the top search bar and open it.
-3. Find `practice-<your user name>` in the list of **General purpose buckets**. This is the bucket the script just created.
+3. Find `practice-<your user name>` in the list of **General purpose buckets**. This is the bucket the script created (now or last session).
 4. Open the bucket and check the tabs **Objects**, **Properties** (region, creation date) and **Permissions** (**Block public access** is on).
 5. Optional: In the **AWS Console**, **Upload** a small file. Then list it from the **terminal on your computer**:
-  ```bash
+
+   ```bash
    aws s3 ls s3://practice-$USER/
-  ```
+   ```
 
 ---
 
-### 2. Launch an EC2 instance in the AWS Console (15 min)
+
+
+### 3. Launch an EC2 instance in the AWS Console + SSH (15 min)
 
 Steps 1–4 happen in the **AWS Console**. Make sure the region in the top right corner of the console is **N. Virginia (us-east-1)**, the same region as in `~/.aws/config` on your computer.
 
 1. In the **AWS Console**, search for **EC2** and open it. Click **Launch instance**.
 2. Fill in the form; leave everything else at its default:
 
-  | Setting                       | Value                                                                      |
-  | ----------------------------- | -------------------------------------------------------------------------- |
-  | **Name**                      | `ec2-console`                                                              |
-  | **Application and OS Images** | **Ubuntu**, *Ubuntu Server 26.04 LTS* (Free tier eligible)                 |
-  | **Instance type**             | `t3.micro`                                                                 |
-  | **Key pair (login)**          | `vockey`                                                                   |
-  | **Network settings**          | **Create security group**, **Allow SSH traffic from** *Anywhere* (default) |
-  | **Configure storage**         | 8 GiB gp3 (default)                                                        |
-  | **File systems**              | None (default)                                                             |
+   | Setting                       | Value                                                                      |
+   | ----------------------------- | -------------------------------------------------------------------------- |
+   | **Name**                      | `ec2-console`                                                              |
+   | **Application and OS Images** | **Ubuntu**, *Ubuntu Server 26.04 LTS* (Free tier eligible)                 |
+   | **Instance type**             | `t3.micro`                                                                 |
+   | **Key pair (login)**          | `vockey`                                                                   |
+   | **Network settings**          | **Create security group**, **Allow SSH traffic from** *Anywhere* (default) |
+   | **Configure storage**         | 8 GiB gp3 (default)                                                        |
+   | **File systems**              | None (default)                                                             |
 
-3. Click **Launch instance**, then **View all instances**.
-4. Wait until **Instance state** is *Running* and **Status check** shows *2/2 checks passed* (1-2 min). Check the box in front of the the instance name and look at the **Details** tab: **Instance ID**, **Public IPv4 address**, **AMI ID**, and under **Security** the security group `launch-wizard-1`.
+3. Click **Launch instance**, then **View all instances** at the bottom of the screen.
+4. Check the box in front of `ec2-console` (if you have more than one, pick the one you just launched). Wait until **Instance state** is *Running* (1-2 min); click the refresh button to update. On the **Details** tab, find the **Instance ID**, **Public IPv4 address** and **AMI ID**. On the **Security** tab, find the security group `launch-wizard-1`.
 5. In the **AWS Console**, copy the **Public IPv4 address** to your clipboard. In the **terminal on your computer**, connect to the instance (replace `<public-ip>` with that address):
-  ```bash
+
+   ```bash
    ssh -i ~/.ssh/labsuser.pem ubuntu@<public-ip>
-  ```
+   ```
+
    Type `yes` to trust the host key on first connect. Ubuntu AMIs use the user name `ubuntu` (Amazon Linux uses `ec2-user`). Once connected, the prompt changes to `ubuntu@ip-...`: you are now in the **shell on the instance**.
 6. In the **shell on the instance**, run the following commands to explore your instance:
-  ```bash
+
+   ```bash
    hostname
    whoami
    nproc          # number of CPUs
    free -h        # memory
    df -h /        # disk
-  ```
-  Then log out, which returns you to the **terminal on your computer**:
-  ```bash
+   ```
+
+   Then log out, which returns you to the **terminal on your computer**:
+
+   ```bash
    exit
-  ```
+   ```
 
-If `ssh` reports `Permission denied (publickey)`, check the key path and run `chmod 400 ~/.ssh/labsuser.pem` in the **terminal on your computer**. Make sure to log in with username `ubuntu`. If it hangs, check in the **AWS Console** (EC2 → Instances → select the instance → **Security** tab) that the security group allows inbound SSH (port 22).
+If `ssh` fails, see [Troubleshooting](#troubleshooting).
 
-Leave the instance running; part 3 reuses its AMI and security group.
+Leave the instance running; part 4 reuses its security group.
 
-### 3. Launch an EC2 instance from the CLI (20 min)
+### 4. Launch an EC2 instance from the CLI + clean up (20 min)
 
 Run all commands in this part in the **terminal on your computer**, except where a step says **shell on the instance**. The `aws` CLI on your computer has your lab credentials; the instance does not. Use one terminal window for the whole part: the shell variables `$IID` and `$IP` exist only in the terminal where you set them.
 
 `aws ec2 run-instances` takes the same choices you made in the console form, as options:
 
-- **AMI:** `ami-0b6d9d3d33ba97d99` is *Ubuntu Server 26.04 LTS* in us-east-1, the same image the console used in part 2. To confirm, in the **AWS Console** select `ec2-console` and compare its **AMI ID** on the **Details** tab.
-- **Security group:** `launch-wizard-1` is the security group the console created in part 2. If you created more than one, check the name under the instance's **Security** tab in the **AWS Console**.
+- **AMI:** `ami-0b6d9d3d33ba97d99` is *Ubuntu Server 26.04 LTS* in us-east-1, the same image the console used in part 3. To confirm, in the **AWS Console** select `ec2-console` and compare its **AMI ID** on the **Details** tab.
+- **Key pair:** `vockey` is the key pair that AWS Academy provides in your Learner Lab account. Its private key is the `labsuser.pem` you downloaded from **AWS Details**, so the same `ssh -i ~/.ssh/labsuser.pem` command works for every instance launched with `--key-name vockey`.
+- **Security group:** `launch-wizard-1` is the security group the console created in part 3. When you launch more instances, reuse it: in the console form, choose **Select existing security group** → `launch-wizard-1`; on the CLI, pass `--security-groups launch-wizard-1`. Each time you pick **Create security group** instead, the console creates a new group with the next suffix (`launch-wizard-2`, `launch-wizard-3`, ...).
 
 **Launch the instance**
 
@@ -143,13 +177,11 @@ IID=$(aws ec2 run-instances \
   --security-groups launch-wizard-1 \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=ec2-cli}]' \
   --query 'Instances[0].InstanceId' --output text)
-echo $IID
+echo "Instance ID: $IID"
 ```
 
+`--tag-specifications` sets the instance name, `ec2-cli`, so you can tell it apart from `ec2-console`.
 `--query` picks fields out of the JSON response (try the command without `--query` and `--output text` to see the full response).
-
-> **Optional:** [launch-ec2-cli.sh](launch-ec2-cli.sh) does the same launch without hard-coding the AMI and security group IDs: it reads both from the running `ec2-console` instance, launches `ec2-cli`, waits for it and prints the `ssh` command. Run it in the **terminal on your computer** with `bash launch-ec2-cli.sh`.
-
 
 | Option                 | Console field                     |
 | ---------------------- | --------------------------------- |
@@ -161,6 +193,8 @@ echo $IID
 
 
 Without `--subnet-id`, AWS picks a subnet in the default VPC, which is how the console launched `ec2-console` as well.
+
+> **Optional:** [01-launch-ec2-cli.sh](01-launch-ec2-cli.sh) does the same launch, and also works if you skipped part 3: it reuses `launch-wizard-1`, or creates it with SSH allowed if it does not exist. It then waits for the instance and prints the `ssh` command. Run it in the **terminal on your computer** with `bash 01-launch-ec2-cli.sh`.
 
 **Wait for it and connect**
 
@@ -176,7 +210,15 @@ ssh -i ~/.ssh/labsuser.pem ubuntu@$IP
 
 In the **AWS Console**, refresh **EC2 → Instances**: `ec2-console` and `ec2-cli` are listed side by side.
 
-Back in the **terminal on your computer**, list all your instances in a table:
+Back in the **terminal on your computer**, list all your instances:
+
+```bash
+aws ec2 describe-instances
+```
+
+The output is a bit overwhelming.
+
+Let's reduce this info to instance name, instance id, state, and public IP address, and format it as a table:
 
 ```bash
 aws ec2 describe-instances \
@@ -184,48 +226,64 @@ aws ec2 describe-instances \
   --output table
 ```
 
+> **Optional:** [02-list-running-ec2-cli.sh](02-list-running-ec2-cli.sh) shows only the *running* instances (name, instance ID, type and public IP). Run it in the **terminal on your computer** with `bash 02-list-running-ec2-cli.sh`.
+
 **Clean up**
 
 In the **terminal on your computer**, terminate both instances. Terminating is permanent: the instance and its disk are deleted.
 
-Copy the instance ID of `ec2-console` (starts with `i-`) from the table above and replace `<ec2-console-id>` with it. `$IID` still holds the ID of `ec2-cli`.
+Copy the instance ID of `ec2-console` (starts with `i-`) from the table above and replace `<ec2-console-id>` with it. `$IID` still holds the ID of `ec2-cli`. If you launched `ec2-cli` with `01-launch-ec2-cli.sh`, `$IID` is empty in your terminal: replace `$IID` with the ID of `ec2-cli` from the table as well.
 
 ```bash
 aws ec2 terminate-instances --instance-ids $IID <ec2-console-id>
 ```
 
+> **Optional:** [03-terminate-all-ec2-cli.sh](03-terminate-all-ec2-cli.sh) terminates **all** instances in your lab account at once, without asking. Run it in the **terminal on your computer** with `bash 03-terminate-all-ec2-cli.sh`.
+
 Wait a minute, then run the `describe-instances` table command again: both instances show `shutting-down`, then `terminated`, and disappear from the list after about an hour. The **AWS Console** shows the same states under **EC2 → Instances** after a refresh.
 
 > When the Learner Lab session ends, running instances are **stopped**, not terminated, and start again with your next **Start Lab**. Stopped and running instances use up your lab budget, so terminate instances you no longer need.
+
+> [!WARNING]
+> **Before you leave class: terminate ALL your EC2 instances.**
+> Running and stopped instances keep using up your lab budget. In the **terminal on your computer**, run:
+>
+> ```bash
+> cd <path_to_your_cloned_fork_of_DS2022_repo>/class/07-ec2
+> bash 03-terminate-all-ec2-cli.sh
+> ```
+>
+> Then click **End Lab** on the **Learner Lab page**.
+
+
 
 ## Resources
 
 - [Launch an EC2 instance](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/LaunchingAndUsingInstances.html)
 - [Amazon EC2 instance types](https://aws.amazon.com/ec2/instance-types)
-- [AWS CLI reference:](https://docs.aws.amazon.com/cli/latest/reference/ec2/run-instances.html) `ec2 run-instances`
-- [Filter AWS CLI output with](https://docs.aws.amazon.com/cli/latest/userguide/cli-usage-filter.html) `--query`
+- [AWS CLI reference: `ec2 run-instances`](https://docs.aws.amazon.com/cli/latest/reference/ec2/run-instances.html)
+- [Filter AWS CLI output with `--query`](https://docs.aws.amazon.com/cli/latest/userguide/cli-usage-filter.html)
 - [Amazon EC2 security groups](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-security-groups.html)
 - [Instance lifecycle (stop, start, terminate)](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/ec2-instance-lifecycle.html)
 
+
+
 ## Troubleshooting
 
-**Status check does not show 2/2 checks passed (AWS Console).** Newer instance types such as `t3.micro` run three checks and show *3/3 checks passed*. *Initializing* means the checks are still running; click the refresh button. If the **Status check** column is missing, turn it on under the gear icon (Preferences) above the instance list.
+`ExpiredToken` **or** `InvalidClientTokenId` **(terminal on your computer).** Your lab credentials changed. On the **Learner Lab page**, copy the new block from **AWS Details** → **AWS CLI** → **Show** into `~/.aws/credentials` on your computer.
 
-**`ExpiredToken` or `InvalidClientTokenId` (terminal on your computer).** Your lab credentials changed. On the **Learner Lab page**, copy the new block from **AWS Details** → **AWS CLI** → **Show** into `~/.aws/credentials` on your computer.
+`01-make-bucket.py`**:** `BucketAlreadyExists`**.** Another AWS account owns `practice-$USER`. Bucket names are global, so pick a different suffix for this one command: `USER=$USER-1 uv run python 01-make-bucket.py` creates `practice-<your user name>-1`. Use that name in part 2.
 
-**`Unable to locate credentials` (shell on the instance).** You ran an `aws` command on the instance. Type `exit` and run it in the **terminal on your computer**.
+`ssh`**:** `UNPROTECTED PRIVATE KEY FILE` **(terminal on your computer).** The key is readable by other users. Run `chmod 400 ~/.ssh/labsuser.pem`. On WSL, the key must be in `~/.ssh`, not under `/mnt/c`.
 
-**`ssh`: `Permission denied (publickey)` (terminal on your computer).** Check the key path, run `chmod 400 ~/.ssh/labsuser.pem`, and log in as `ubuntu`.
+`ssh`**:** `Permission denied (publickey)` **(terminal on your computer).** Check the key path, run `chmod 400 ~/.ssh/labsuser.pem`, and log in as `ubuntu`.
 
-**`ssh`: `UNPROTECTED PRIVATE KEY FILE` (terminal on your computer).** The key is readable by other users. Run `chmod 400 ~/.ssh/labsuser.pem`. On WSL, the key must be in `~/.ssh`, not under `/mnt/c`.
+`ssh`**:** `Connection refused` **right after launch (terminal on your computer).** The instance is still booting, even when the **AWS Console** already shows *Running*. Wait 30 seconds and retry.
 
-**`ssh` hangs or times out.** In the **AWS Console** (EC2 → Instances → select the instance → **Security** tab), check that the security group allows inbound SSH (port 22). Also check that you use the instance's current **Public IPv4 address** (it changes when the instance is stopped and started).
+`ssh` **hangs or times out.** In the **AWS Console** (EC2 → Instances → select the instance → **Security** tab), check that the security group allows inbound SSH (port 22). Also check that you use the instance's current **Public IPv4 address** (it changes when the instance is stopped and started).
 
-**`ssh`: `Connection refused` right after launch.** The instance is still booting. Wait 30 seconds and retry from the **terminal on your computer**.
+`Unable to locate credentials` **(shell on the instance).** You ran an `aws` command on the instance. Type `exit` and run it in the **terminal on your computer**.
 
-**`run-instances`: `InvalidGroup.NotFound` (terminal on your computer).** Your security group has a different name. In the **AWS Console**, select `ec2-console` and check the name on the **Security** tab (e.g. `launch-wizard-2`), then use that name with `--security-groups`.
+`run-instances`**:** `InvalidGroup.NotFound` **(terminal on your computer).** Your security group has a different name. In the **AWS Console**, select `ec2-console` and check the name on the **Security** tab (e.g. `launch-wizard-2`), then use that name with `--security-groups`.
 
-**`echo $IID` or `echo $IP` prints nothing.** You opened a new terminal window or tab, so the shell variables are gone. Run the commands that set them again in the same terminal.
-
-**`01-make-bucket.py`: `BucketAlreadyExists`.** Another AWS account owns `practice-$USER`. Bucket names are global; use `practice-$USER-1` instead.
-
+`echo $IID` **or** `echo $IP` **prints nothing.** You opened a new terminal window or tab, so the shell variables are gone. Run the commands that set them again in the same terminal.
