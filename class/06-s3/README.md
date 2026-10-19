@@ -1,5 +1,9 @@
 # AWS S3 Storage
 
+> [!CAUTION]
+> **Do NOT click Reset in the AWS Academy Learner Lab unless your instructor tells you to.**
+> Reset permanently deletes everything in your lab account (S3 buckets, EC2 instances, Lambda functions, ...) and cannot be undone. To pause, click **End Lab**: your resources stay and are back with the next **Start Lab**.
+
 This session focuses on **S3**, object storage for datasets, backups, and pipeline I/O. Building on [IAM](../06-iam/README.md), you will:
 
 - start an AWS Academy **Learner Lab** and inspect its pre-created IAM roles
