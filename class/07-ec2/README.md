@@ -228,9 +228,50 @@ aws ec2 describe-instances \
 
 > **Optional:** [02-list-running-ec2-cli.sh](02-list-running-ec2-cli.sh) shows only the *running* instances (name, instance ID, type and public IP). Run it in the **terminal on your computer** with `bash 02-list-running-ec2-cli.sh`.
 
+**Optional: set up an instance at boot with user data**
+
+A new instance has only the plain Ubuntu operating system. Instead of logging in and installing software by hand, you can give EC2 a shell script, called **user data**. EC2 runs it once, as root, the first time the instance boots. [user_data.sh](user_data.sh) is a simple example:
+
+```bash
+#!/bin/bash
+
+# 1. Update the package list
+apt-get update -y
+
+# 2. Install Git, cURL, and Python 3 without asking for confirmation
+apt-get install -y git curl python3
+
+# 3. Install uv
+curl -LsSf https://astral.sh/uv/install.sh | env UV_INSTALL_DIR="/usr/local/bin" sh
+
+# 4. Create a project directory and clone a repository into it
+mkdir -p /home/ubuntu/code
+git clone https://github.com/ksiller/DS2022.git /home/ubuntu/code/DS2022
+
+# 5. Optional: Fix permissions so the 'ubuntu' user owns the cloned files
+chown -R ubuntu:ubuntu /home/ubuntu/code
+```
+
+[04-launch-ec2-user-data-cli.sh](04-launch-ec2-user-data-cli.sh) launches `ec2-user-data` with the same options as above, plus `--user-data file://user_data.sh`. In the **terminal on your computer**, run:
+
+```bash
+cd <path_to_your_cloned_fork_of_DS2022_repo>/class/07-ec2
+bash 04-launch-ec2-user-data-cli.sh
+```
+
+Connect with the `ssh` command the script prints. In the **shell on the instance**, wait for user data to finish, then check the result:
+
+```bash
+cloud-init status --wait     # prints status: done when user data has finished
+ls ~/code/DS2022
+uv --version
+```
+
+If the status is `error`, read the end of `/var/log/cloud-init-output.log`: it has the output of every command in `user_data.sh`. Type `exit` to return to the **terminal on your computer**.
+
 **Clean up**
 
-In the **terminal on your computer**, terminate both instances. Terminating is permanent: the instance and its disk are deleted.
+In the **terminal on your computer**, terminate both instances (and `ec2-user-data`, if you launched it). Terminating is permanent: the instance and its disk are deleted.
 
 Copy the instance ID of `ec2-console` (starts with `i-`) from the table above and replace `<ec2-console-id>` with it. `$IID` still holds the ID of `ec2-cli`. If you launched `ec2-cli` with `01-launch-ec2-cli.sh`, `$IID` is empty in your terminal: replace `$IID` with the ID of `ec2-cli` from the table as well.
 
