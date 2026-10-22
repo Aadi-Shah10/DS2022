@@ -45,14 +45,26 @@ Acknowledge **Recursive invocation** → **Add**.
 
 Show the trigger in **Function overview**, **Configuration** → **Triggers**, and **S3** → `demo-mst3k` → **Properties** → **Event notifications**.
 
-## 6. Upload a file and read the log
+## 6. Upload a file
 
 ```bash
 curl -sSo pg74.txt https://www.gutenberg.org/cache/epub/74/pg74.txt
 aws s3 cp pg74.txt s3://demo-mst3k/
 ```
 
-**Monitor** → **View CloudWatch logs** → newest log stream:
+## 7. Check the CloudWatch logs
+
+From the function: **Monitor** tab → **View CloudWatch logs** → newest log stream.
+
+From CloudWatch: **CloudWatch** → **Logs** → **Log groups** → `/aws/lambda/wordcount` → newest log stream (`YYYY/MM/DD/[$LATEST]...`).
+
+From the terminal:
+
+```bash
+aws logs tail /aws/lambda/wordcount --since 10m
+```
+
+Expected:
 
 ```text
 pg74.txt: 73849 words
@@ -61,7 +73,7 @@ REPORT RequestId: ... Duration: ... ms ... Max Memory Used: ... MB
 
 No log after a minute: upload again (the first trigger on a bucket can take a few minutes).
 
-## 7. Preview: the same steps with Chalice
+## 8. Preview: the same steps with Chalice
 
 In Lab 07, Part 2, a Chalice app creates the same pieces from code:
 
@@ -73,12 +85,13 @@ In Lab 07, Part 2, a Chalice app creates the same pieces from code:
 | S3 trigger: bucket, event type, suffix | `@app.on_s3_event(bucket=BUCKET, events=["s3:ObjectCreated:*"], suffix=".txt")` |
 | No packages | `requirements.txt`: `pymongo`, `nltk` |
 | **Deploy** | `uv run chalice deploy` |
-| **Monitor** → **View CloudWatch logs** | `uv run chalice logs -n analyze_new_book` |
+| **Monitor** → **View CloudWatch logs**, `aws logs tail` | `uv run chalice logs -n analyze_new_book` |
 
-## 8. Clean up
+## 9. Clean up
 
 **Lambda** → **Functions** → `wordcount` → **Actions** → **Delete**.
 
 ```bash
 aws s3 rb s3://demo-mst3k --force
+aws logs delete-log-group --log-group-name /aws/lambda/wordcount
 ```
