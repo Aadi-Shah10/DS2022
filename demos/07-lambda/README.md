@@ -29,7 +29,7 @@ In the AWS Console, open **Lambda** → **Functions** → **Create function** �
 
 ## 4. Look at memory and timeout
 
-**Configuration** → **General configuration**: 128 MB, 3 s (enough here; Lab 07 uses 1024 MB, 300 s).
+**Configuration** → **General configuration**: 128 MB, 3 s (enough here; Lab 07 uses 512 MB, 60 s).
 
 ## 5. Add the S3 trigger
 
@@ -83,7 +83,7 @@ In Lab 07, Part 2, a Chalice app creates the same pieces from code:
 | `lambda_function.py`, `lambda_handler` | `app.py`, `chalicelib/analyze.py` |
 | Memory and timeout | `"lambda_memory_size"`, `"lambda_timeout"` in `.chalice/config.json` |
 | S3 trigger: bucket, event type, suffix | `@app.on_s3_event(bucket=BUCKET, events=["s3:ObjectCreated:*"], suffix=".txt")` |
-| No packages | `requirements.txt`: `pymongo`, `nltk` |
+| No packages | `requirements.txt`: `pymongo` |
 | **Deploy** | `uv run chalice deploy` |
 | **Monitor** → **View CloudWatch logs**, `aws logs tail` | `uv run chalice logs -n analyze_new_book` |
 
