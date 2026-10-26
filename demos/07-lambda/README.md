@@ -5,6 +5,12 @@ Instructor demo, before Lab 07 Part 2: a word-count function for `.txt` uploads,
 > [!IMPORTANT]
 > Use a separate bucket, not `public-mst3k`. A second `.txt` trigger on the Lab 06 bucket makes `chalice deploy` fail.
 
+## 0. Setup
+
+1. On the **Learner Lab page**, click **Start Lab** and wait for the green **AWS** icon. See [Start the AWS Academy Learner Lab (class/06-s3)](../../class/06-s3/README.md#start-the-aws-academy-learner-lab).
+2. Click **AWS Details** → **AWS CLI** → **Show**. Copy the block into `~/.aws/credentials` on your computer (credentials change with every lab session). Check with `aws sts get-caller-identity`.
+3. Click the green **AWS** icon to open the AWS Console.
+
 ## 1. Create a bucket for the demo
 
 ```bash
@@ -13,27 +19,27 @@ aws s3 mb s3://demo-mst3k
 
 ## 2. Create the function
 
-In the AWS Console, open **Lambda** → **Functions** → **Create function** → **Author from scratch**:
+In the AWS Console, search for **Lambda** → **Event Functions** → **Create function** → **Author from scratch**:
 
 | Field | Value |
 | --- | --- |
 | **Function name** | `wordcount` |
 | **Runtime** | Python 3.13 |
-| **Change default execution role** | **Use an existing role** → `LabRole` |
+| **Additional settings** → **Custom execution role** | turn on → **Execution role** `LabRole` → **Save** |
 
-**Create function**.
+**Create Event Function**. If a **Getting started** pop-up appears, click **Dismiss**.
 
 ## 3. Add the code
 
-**Code** tab → replace `lambda_function.py` with [lambda_function.py](lambda_function.py) → **Deploy**.
+Click the **Code** tab. In the inline code editor, delete all code and paste the code from [lambda_function.py](lambda_function.py). Click **Deploy**.
 
 ## 4. Look at memory and timeout
 
-**Configuration** → **General configuration**: 128 MB, 3 s (enough here; Lab 07 uses 512 MB, 60 s).
+Click the **Configuration** tab. Under **General configuration**, confirm the **Memory** (128 MB) and **Timeout** (3 s) settings. That's enough here; Lab 07 uses 512 MB and 60 s.
 
 ## 5. Add the S3 trigger
 
-**Function overview** → **Add trigger** → **S3**:
+Under **Function overview**, click **+ Add trigger**. Under **Trigger configuration**, select **S3** as the source. Then complete the trigger configuration fields according to this table:
 
 | Field | Value |
 | --- | --- |
@@ -56,9 +62,15 @@ aws s3 cp pg74.txt s3://demo-mst3k/
 
 From the function: **Monitor** tab → **View CloudWatch logs** → newest log stream.
 
-From CloudWatch: **CloudWatch** → **Logs** → **Log groups** → `/aws/lambda/wordcount` → newest log stream (`YYYY/MM/DD/[$LATEST]...`).
+From CloudWatch: **CloudWatch** → **Logs** → **Log Management** → `/aws/lambda/wordcount` → newest log stream (`YYYY/MM/DD/[$LATEST]...`).
 
 From the terminal:
+
+```bash
+aws logs filter-log-events --log-group-name /aws/lambda/wordcount --query 'events[].[message]' --output text
+```
+
+With AWS CLI v2 only (check with `aws --version`), the shorter `tail` command also works:
 
 ```bash
 aws logs tail /aws/lambda/wordcount --since 10m
@@ -85,7 +97,7 @@ In Lab 07, Part 2, a Chalice app creates the same pieces from code:
 | S3 trigger: bucket, event type, suffix | `@app.on_s3_event(bucket=BUCKET, events=["s3:ObjectCreated:*"], suffix=".txt")` |
 | No packages | `requirements.txt`: `pymongo` |
 | **Deploy** | `uv run chalice deploy` |
-| **Monitor** → **View CloudWatch logs**, `aws logs tail` | `uv run chalice logs -n analyze_new_book` |
+| **Monitor** → **View CloudWatch logs**, `aws logs filter-log-events` | `uv run chalice logs -n analyze_new_book` |
 
 ## 9. Clean up
 
