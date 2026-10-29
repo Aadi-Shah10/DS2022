@@ -139,6 +139,8 @@ Compare with `lambda_handler` in [lambda_function.py](../../demos/07-lambda/lamb
 | `def count_words(event)` | the Lambda function, deployed as `textapp-dev-count_words` (confirm in AWS console) |
 | `event.bucket`, `event.key` | the bucket and the decoded object key, read by Chalice from the raw event dict (the raw dict is still in `event.to_dict()`) |
 
+Chalice names each Lambda function `{app_name}-{stage}-{function}`: `textapp` from `"app_name"` in `.chalice/config.json`, `dev` from the stage under `"stages"` in `.chalice/config.json`, and `count_words` from the function name in `app.py`. A stage is a separate deployment of the same app with its own settings, for example `dev` for testing and `prod` for production. `chalice deploy` uses `dev` unless you pass `--stage`; `chalice deploy --stage prod` would create a second, independent function `textapp-prod-count_words` (after adding a `prod` entry under `"stages"`).
+
 **No `context` parameter.** `lambda_handler(event, context)` takes two arguments; `count_words(event)` takes only one. Lambda still passes both, but to a wrapper that Chalice puts in front of your function:
 
 ```mermaid
@@ -215,6 +217,13 @@ Expected:
 
 No log after a minute: upload again (the first trigger on a bucket can take a few minutes). The same log is in the console: **Monitor** tab → **View CloudWatch logs**.
 
+## Optional Practice
+
+Two optional exercises at the end of this page add to the app you just deployed:
+
+1. [Exercise 1: Trigger on file object deletion](#exercise-1-trigger-on-file-object-deletion)
+2. [Exercise 2: Write the word count to a second bucket](#exercise-2-write-the-word-count-to-a-second-bucket)
+
 ## 8. Clean up
 
 `chalice delete` removes the function and the trigger:
@@ -236,3 +245,100 @@ aws logs delete-log-group --log-group-name /aws/lambda/textapp-dev-count_words
 | **Deploy** | `uv run chalice deploy` |
 | **Monitor** → **View CloudWatch logs** | `uv run chalice logs -n count_words` |
 | **Actions** → **Delete** | `uv run chalice delete` |
+
+## Optional Practice
+
+These exercises add to the app from Steps 1–7: the bucket `demo-mst3k`, the function `textapp-dev-count_words`, and the file `pg74.txt` in the bucket. If you already ran Step 8, repeat Steps 1–7 first.
+
+### Exercise 1: Trigger on file object deletion
+
+Add a second handler to `app.py` that runs when a `.txt` file is deleted from the bucket:
+
+```python
+@app.on_s3_event(bucket=BUCKET, events=["s3:ObjectRemoved:*"], suffix=".txt")
+def log_deletion(event):
+    """Log the key of the deleted file."""
+    print(f"{event.key}: deleted")
+```
+
+- The object no longer exists when the handler runs, so it can only use the event (`event.bucket`, `event.key`), not the file content.
+
+Deploy the updated app:
+
+```bash
+uv run chalice deploy
+```
+
+- `chalice deploy` creates a second Lambda function, `textapp-dev-log_deletion`, and adds a second event notification to the bucket. The name follows the same pattern `{app_name}-{stage}-{function}`: `textapp` from `"app_name"` in `.chalice/config.json`, `dev` from the stage under `"stages"` in `.chalice/config.json`, and `log_deletion` from the function name in `app.py`.
+- Switch to the AWS Console, locate the new `textapp-dev-log_deletion` Lambda function under **Lambda** → **Functions**, and review the **Code** and **Configuration** tabs.
+
+Test it:
+
+```bash
+aws s3 rm s3://demo-mst3k/pg74.txt
+uv run chalice logs -n log_deletion
+```
+
+### Exercise 2: Write the word count to a second bucket
+
+Instead of only logging the word count, `count_words` saves it as a new object in a second bucket. Create the bucket (replace `mst3k` with your own computing ID or other unique identifier):
+
+```bash
+aws s3 mb s3://demo-mst3k-output
+```
+
+In `app.py`, add this import at the top:
+
+```python
+import json
+```
+
+Add the output bucket below `BUCKET`:
+
+```python
+OUTPUT_BUCKET = "demo-mst3k-output"
+```
+
+Add these lines at the end of the `count_words` function. Pay attention to proper indentation to ensure the new lines are part of the function code block.
+
+```python
+    # Save the result in the output bucket: pg74.txt -> pg74.txt.json
+    result = {"key": event.key, "words": len(text.split())}
+    s3.put_object(Bucket=OUTPUT_BUCKET, Key=f"{event.key}.json", Body=json.dumps(result))
+```
+
+> [!WARNING]
+> Do not write the output to `BUCKET`, the bucket that triggers the function. An output key ending in `.txt` would trigger `count_words` again, which writes another output, and so on: an endless loop of Lambda invocations.
+>
+> **Best practice:** write a Lambda function's output to a second bucket. The function has no trigger on that bucket, so no output key can start a loop, even if the suffix filter or the key changes later.
+
+Deploy the updated app; `chalice deploy` updates `textapp-dev-count_words` in place:
+
+```bash
+uv run chalice deploy
+```
+
+Test it:
+
+```bash
+aws s3 cp pg74.txt s3://demo-mst3k/
+aws s3 cp s3://demo-mst3k-output/pg74.txt.json -
+```
+
+Expected:
+
+```text
+{"key": "pg74.txt", "words": 73849}
+```
+
+### Clean up
+
+`chalice delete` removes both functions and their triggers. The other commands remove the two buckets and the log groups of both functions:
+
+```bash
+uv run chalice delete
+aws s3 rb s3://demo-mst3k --force
+aws s3 rb s3://demo-mst3k-output --force
+aws logs delete-log-group --log-group-name /aws/lambda/textapp-dev-count_words
+aws logs delete-log-group --log-group-name /aws/lambda/textapp-dev-log_deletion
+```
